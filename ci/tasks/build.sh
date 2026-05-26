@@ -130,7 +130,8 @@ aliyun ecs ImportImage \
     --DiskDeviceMapping.1.Format $disk_format \
     --Architecture $architecture \
     --ImageName $original_stemcell_name \
-    --Description "${image_description}"
+    --Description "${image_description}" \
+    --Features.NvmeSupport supported
 
 sleep 5
 
@@ -232,6 +233,27 @@ do
             break
         fi
     done
+done
+
+echo -e "Ensuring NvmeSupport attribute is set on all region images..."
+for regionId in ${image_destinations[*]}
+do
+    region_image_id="$(aliyun ecs DescribeImages \
+        --access-key-id ${image_access_key} \
+        --access-key-secret ${image_secret_key} \
+        --region ${regionId} \
+        --RegionId ${regionId} \
+        --ImageName ${original_stemcell_name} \
+        --Status Available \
+        | jq -r '.Images.Image[0].ImageId')"
+    aliyun ecs ModifyImageAttribute \
+        --access-key-id ${image_access_key} \
+        --access-key-secret ${image_secret_key} \
+        --region ${regionId} \
+        --RegionId ${regionId} \
+        --ImageId ${region_image_id} \
+        --Features.NvmeSupport supported
+    echo "[$regionId] Set NvmeSupport=supported on image ${region_image_id}"
 done
 
 ( IFS=$',\n'; echo "${imageIds[*]}" ) >> ${success_message}

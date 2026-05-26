@@ -131,7 +131,8 @@ aliyun ecs ImportImage \
     --Architecture $architecture \
     --ImageName $original_stemcell_name \
     --Description "${image_description}" \
-    --Features.NvmeSupport supported
+    --Features.NvmeSupport supported \
+    --force
 
 sleep 5
 
@@ -252,7 +253,8 @@ do
         --region ${regionId} \
         --RegionId ${regionId} \
         --ImageId ${region_image_id} \
-        --Features.NvmeSupport supported
+        --Features.NvmeSupport supported \
+        --force
     echo "[$regionId] Set NvmeSupport=supported on image ${region_image_id}"
 done
 

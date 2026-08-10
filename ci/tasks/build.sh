@@ -219,23 +219,40 @@ do
     if [[ $regionId == ${image_region} ]]; then
         image_id=$base_image_id
     else
-
-        cleanup_previous_image ${image_access_key} ${image_secret_key} ${regionId} ${original_stemcell_name}
-
-        CopyImageResponse="$(aliyun ecs CopyImage \
-            --access-key-id ${image_access_key}  \
+        # Same reasoning as the base region: a copy that is already there is
+        # bit-identical to one made now, and cannot be deleted first once it has
+        # been shared publicly.
+        existing_region_image_id="$(aliyun ecs DescribeImages \
+            --access-key-id ${image_access_key} \
             --access-key-secret ${image_secret_key} \
-            --region ${image_region} \
-            --RegionId ${image_region} \
-            --ImageId $base_image_id \
-            --DestinationRegionId $regionId \
-            --DestinationImageName $original_stemcell_name \
-            --DestinationDescription "${image_description}" \
-            --Tag.1.Key CopyFrom \
-            --Tag.1.Value $base_image_id
-            )"
-        echo -e "CopyImage to $regionId Response: $CopyImageResponse"
-        image_id="$(echo $CopyImageResponse | jq -r '.ImageId' )"
+            --region ${regionId} \
+            --RegionId ${regionId} \
+            --ImageName ${original_stemcell_name} \
+            --Status Available \
+            --ImageOwnerAlias self \
+            | jq -r '.Images.Image[0].ImageId // empty')"
+
+        if [[ -n "${existing_region_image_id}" ]]; then
+            echo -e "Reusing the image already present in ${regionId}: ${existing_region_image_id}"
+            image_id="${existing_region_image_id}"
+        else
+            cleanup_previous_image ${image_access_key} ${image_secret_key} ${regionId} ${original_stemcell_name}
+
+            CopyImageResponse="$(aliyun ecs CopyImage \
+                --access-key-id ${image_access_key}  \
+                --access-key-secret ${image_secret_key} \
+                --region ${image_region} \
+                --RegionId ${image_region} \
+                --ImageId $base_image_id \
+                --DestinationRegionId $regionId \
+                --DestinationImageName $original_stemcell_name \
+                --DestinationDescription "${image_description}" \
+                --Tag.1.Key CopyFrom \
+                --Tag.1.Value $base_image_id
+                )"
+            echo -e "CopyImage to $regionId Response: $CopyImageResponse"
+            image_id="$(echo $CopyImageResponse | jq -r '.ImageId' )"
+        fi
     fi
     echo "    $regionId: $image_id" >> ${stemcell_manifest}
     imageIds+=("\"$image_id\"")
